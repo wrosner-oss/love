@@ -1,5 +1,9 @@
 import { setPerson, fetchState } from './state.js';
 import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove } from './entry.js';
+import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
+import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
+import { ParticleSystem } from './particles.js';
+import { COLORS } from './constants.js';
 
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
@@ -10,6 +14,7 @@ let h = 0;
 let transitionAlpha = 0;
 let transitionTarget = null;
 let lastWallTime = 0;
+let athanorParticles = null;
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
@@ -22,6 +27,10 @@ function resize() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (currentScreen === 'entry') resizeEntry(w, h);
+    if (currentScreen === 'athanor') {
+        layoutVessels(w, h);
+        if (athanorParticles) athanorParticles.resize(w, h);
+    }
 }
 
 function onPersonSelected(person) {
@@ -31,8 +40,27 @@ function onPersonSelected(person) {
     transitionAlpha = 0;
 
     fetchState().then(() => {
-        // State loaded — transition will complete in the loop
+        initVessels(w, h, onVesselSelected);
+        athanorParticles = new ParticleSystem({
+            count: 50,
+            color: '#c8b07a',
+            maxAlpha: 0.2,
+            speed: 0.15,
+        });
+        athanorParticles.resize(w, h);
     });
+}
+
+function onVesselSelected(vesselId) {
+    const pos = getVesselPosition(vesselId);
+    if (pos) {
+        // If clicking the same vessel that already has a flame, hide it
+        if (isFlameActive() && getFlameVesselId() === vesselId) {
+            hideFlame();
+        } else {
+            showFlame(vesselId, pos.x, pos.y);
+        }
+    }
 }
 
 function tick() {
@@ -58,7 +86,7 @@ function tick() {
         if (transitionAlpha > 0) {
             transitionAlpha = Math.max(0, transitionAlpha - dt * 1.0);
         }
-        drawAthanorPlaceholder(ctx, w, h);
+        drawAthanor(ctx, w, h, dt);
         if (transitionAlpha > 0) {
             ctx.fillStyle = `rgba(10, 10, 26, ${transitionAlpha})`;
             ctx.fillRect(0, 0, w, h);
@@ -66,48 +94,93 @@ function tick() {
     }
 }
 
+function drawAthanor(ctx, w, h, dt) {
+    // Background
+    ctx.fillStyle = COLORS.background;
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle center warmth
+    const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.45);
+    grad.addColorStop(0, 'rgba(35, 28, 45, 0.4)');
+    grad.addColorStop(1, 'rgba(10, 10, 26, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Background particles
+    if (athanorParticles) {
+        athanorParticles.update();
+        athanorParticles.draw(ctx);
+    }
+
+    // Update & draw vessels
+    updateVessels(dt);
+    drawVessels(ctx, w, h);
+
+    // Update & draw flame
+    updateFlame(dt);
+    drawFlame(ctx);
+}
+
 function init() {
     resize();
     window.addEventListener('resize', resize);
 
+    // Click handler
     canvas.addEventListener('click', (e) => {
-        if (currentScreen === 'entry') handleEntryClick(e.clientX, e.clientY);
+        const x = e.clientX;
+        const y = e.clientY;
+        if (currentScreen === 'entry') {
+            handleEntryClick(x, y);
+        } else if (currentScreen === 'athanor' && !isDragging()) {
+            handleVesselClick(x, y);
+        }
     });
 
+    // Mouse move
     canvas.addEventListener('mousemove', (e) => {
-        if (currentScreen === 'entry') handleEntryMouseMove(e.clientX, e.clientY, canvas);
+        const x = e.clientX;
+        const y = e.clientY;
+        if (currentScreen === 'entry') {
+            handleEntryMouseMove(x, y, canvas);
+        } else if (currentScreen === 'athanor') {
+            if (isDragging()) {
+                handleFlameDrag(x, y);
+                canvas.style.cursor = 'grabbing';
+            } else {
+                const hovered = handleVesselMouseMove(x, y);
+                canvas.style.cursor = hovered ? 'pointer' : 'default';
+            }
+        }
+    });
+
+    // Mouse down for flame drag
+    canvas.addEventListener('mousedown', (e) => {
+        if (currentScreen === 'athanor') {
+            if (handleFlameMouseDown(e.clientX, e.clientY)) {
+                canvas.style.cursor = 'grabbing';
+            }
+        }
+    });
+
+    // Mouse up to release flame
+    canvas.addEventListener('mouseup', () => {
+        if (currentScreen === 'athanor') {
+            handleFlameMouseUp();
+            canvas.style.cursor = 'default';
+        }
     });
 
     initEntry(w, h, onPersonSelected);
 
-    // Primary: requestAnimationFrame for smooth visible-tab rendering
+    // Primary: requestAnimationFrame
     function rafLoop() {
         tick();
         requestAnimationFrame(rafLoop);
     }
     requestAnimationFrame(rafLoop);
 
-    // Fallback: setInterval for background tabs (throttled but still runs)
-    setInterval(() => {
-        tick();
-    }, 100);
-}
-
-function drawAthanorPlaceholder(ctx, w, h) {
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(0, 0, w, h);
-
-    const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.4);
-    grad.addColorStop(0, 'rgba(40, 30, 50, 0.3)');
-    grad.addColorStop(1, 'rgba(10, 10, 26, 0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.font = 'italic 300 26px Georgia, "Cormorant Garamond", serif';
-    ctx.fillStyle = '#c8b07a';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('The Athanor awakens...', w / 2, h / 2);
+    // Fallback for background tabs
+    setInterval(() => { tick(); }, 100);
 }
 
 init();
