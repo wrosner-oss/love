@@ -172,11 +172,20 @@ function init() {
         if (currentScreen === 'entry') {
             handleEntryClick(x, y);
         } else if (currentScreen === 'athanor' && !isDragging()) {
-            if (isDetailVisible()) {
-                hideDetail();
-                hideFlame();
-            } else if (isHistoryVisible()) {
+            if (isHistoryVisible()) {
                 hideHistory();
+            } else if (isDetailVisible()) {
+                // Check if clicking a different vessel while detail is open
+                const hit = handleVesselMouseMove(x, y);
+                if (hit && hit !== getFlameVesselId()) {
+                    // Switch to the new vessel
+                    handleVesselClick(x, y);
+                } else if (!hit) {
+                    // Clicked empty space — close the panel
+                    hideDetail();
+                    hideFlame();
+                }
+                // If clicking the same vessel, do nothing (flame is already there)
             } else {
                 handleVesselClick(x, y);
             }
@@ -193,11 +202,16 @@ function init() {
             if (isDragging()) {
                 handleFlameDrag(x, y);
                 canvas.style.cursor = 'grabbing';
-            } else if (!isDetailVisible() && !isHistoryVisible()) {
-                const hovered = handleVesselMouseMove(x, y);
-                canvas.style.cursor = hovered ? 'pointer' : 'default';
             } else {
-                canvas.style.cursor = 'default';
+                const hovered = handleVesselMouseMove(x, y);
+                if (hovered) {
+                    canvas.style.cursor = 'pointer';
+                } else if (isFlameActive()) {
+                    // Check if hovering over flame area
+                    canvas.style.cursor = 'grab';
+                } else {
+                    canvas.style.cursor = 'default';
+                }
             }
         }
     });
@@ -214,9 +228,9 @@ function init() {
         }
     });
 
-    // Mouse down for flame drag
+    // Mouse down for flame drag — works even when detail panel is open
     canvas.addEventListener('mousedown', (e) => {
-        if (currentScreen === 'athanor' && !isDetailVisible() && !isHistoryVisible()) {
+        if (currentScreen === 'athanor' && !isHistoryVisible()) {
             if (handleFlameMouseDown(e.clientX, e.clientY)) {
                 canvas.style.cursor = 'grabbing';
             }
