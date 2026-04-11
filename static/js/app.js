@@ -2,6 +2,7 @@ import { setPerson, fetchState } from './state.js';
 import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove } from './entry.js';
 import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
+import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
 import { ParticleSystem } from './particles.js';
 import { COLORS } from './constants.js';
 
@@ -29,6 +30,7 @@ function resize() {
     if (currentScreen === 'entry') resizeEntry(w, h);
     if (currentScreen === 'athanor') {
         layoutVessels(w, h);
+        layoutConiunctio(w, h);
         if (athanorParticles) athanorParticles.resize(w, h);
     }
 }
@@ -41,6 +43,7 @@ function onPersonSelected(person) {
 
     fetchState().then(() => {
         initVessels(w, h, onVesselSelected);
+        initConiunctio(w, h);
         athanorParticles = new ParticleSystem({
             count: 50,
             color: '#c8b07a',
@@ -112,7 +115,11 @@ function drawAthanor(ctx, w, h, dt) {
         athanorParticles.draw(ctx);
     }
 
-    // Update & draw vessels
+    // Center visualization
+    updateConiunctio(dt);
+    drawConiunctio(ctx);
+
+    // Vessels on top
     updateVessels(dt);
     drawVessels(ctx, w, h);
 
