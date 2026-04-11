@@ -1,5 +1,6 @@
 import { COLORS, VESSELS } from './constants.js';
 import { getState, getPerson, onAdjustment } from './state.js';
+import { playBurst } from './sound.js';
 
 // --- Config ---
 const SOL_COUNT = 150;
@@ -41,6 +42,7 @@ export function initConiunctio(w, h) {
     onAdjustment((event) => {
         const color = event.person === 'wes' ? COLORS.sol.glow : COLORS.luna.glow;
         triggerEvent(event.magnitude, color);
+        playBurst(event.magnitude);
     });
 }
 

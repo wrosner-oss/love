@@ -1,5 +1,6 @@
 import { COLORS } from './constants.js';
 import { getPerson, postAdjustment, getState } from './state.js';
+import { playFlameLevel } from './sound.js';
 
 let active = false;
 let vesselId = null;
@@ -130,11 +131,20 @@ export function handleFlameMouseDown(x, y) {
     return false;
 }
 
+let lastSoundLevel = 0;
+
 export function handleFlameDrag(x, y) {
     if (!dragging) return;
     const fy = vesselY + 55;
     const dy = fy - y;
     dragLevel = Math.max(1, Math.min(5, 1 + (dy / 45) * 4));
+
+    // Play tone when crossing a level threshold
+    const roundedLevel = Math.round(dragLevel);
+    if (roundedLevel !== lastSoundLevel && roundedLevel >= 1 && roundedLevel <= 5) {
+        lastSoundLevel = roundedLevel;
+        playFlameLevel(roundedLevel);
+    }
 }
 
 export async function handleFlameMouseUp() {

@@ -1,4 +1,4 @@
-import { setPerson, fetchState } from './state.js';
+import { setPerson, fetchState, getState } from './state.js';
 import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove } from './entry.js';
 import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
@@ -6,8 +6,9 @@ import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } fr
 import { showHistory, hideHistory, isHistoryVisible, updateHistory, drawHistory } from './history.js';
 import { showDetail, hideDetail, isDetailVisible, updateDetail, drawDetail } from './detail.js';
 import { initAtmosphere, layoutAtmosphere, updateAtmosphere, drawAtmosphere } from './atmosphere.js';
+import { startAudio, startDrone, updateDrone, playChime, playBurst, toggleMute, isMuted } from './sound.js';
 import { ParticleSystem } from './particles.js';
-import { COLORS } from './constants.js';
+import { COLORS, VESSELS } from './constants.js';
 
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
@@ -42,12 +43,14 @@ function resize() {
 }
 
 function onPersonSelected(person) {
+    startAudio(); // User gesture — safe to init audio
     setPerson(person);
     transitionTarget = 'athanor';
     currentScreen = 'transition';
     transitionAlpha = 0;
 
     fetchState().then(() => {
+        startDrone();
         initVessels(w, h, onVesselSelected);
         initConiunctio(w, h);
         initAtmosphere(w, h);
@@ -70,10 +73,11 @@ function onPersonSelected(person) {
 function onVesselSelected(vesselId) {
     const pos = getVesselPosition(vesselId);
     if (pos) {
-        // Show flame for interaction
         showFlame(vesselId, pos.x, pos.y);
-        // Show detail panel
         showDetail(vesselId);
+        // Play chime tuned to this vessel's hue
+        const vessel = VESSELS.find(v => v.id === vesselId);
+        if (vessel) playChime(vessel.hue);
     }
 }
 
@@ -140,6 +144,17 @@ function drawAthanor(ctx, w, h, dt) {
     // Atmospheric energy field
     updateAtmosphere(dt);
     drawAtmosphere(ctx, w, h);
+
+    // Update drone sound based on alignment
+    const state = getState();
+    let totalDiff = 0, count = 0;
+    for (const v of VESSELS) {
+        const wl = state.wes?.[v.id] || 0;
+        const al = state.amelia?.[v.id] || 0;
+        if (wl > 0 && al > 0) { totalDiff += Math.abs(wl - al); count++; }
+    }
+    const alignment = count > 0 ? 1 - (totalDiff / (count * 4)) : 0.5;
+    updateDrone(alignment);
 
     // Center visualization
     updateConiunctio(dt);
