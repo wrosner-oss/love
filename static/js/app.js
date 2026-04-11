@@ -1,5 +1,5 @@
 import { setPerson, fetchState } from './state.js';
-import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove, getBackgroundVideo } from './entry.js';
+import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove } from './entry.js';
 import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
 import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
@@ -19,6 +19,8 @@ let transitionAlpha = 0;
 let transitionTarget = null;
 let lastWallTime = 0;
 let athanorParticles = null;
+let bgImage = null;
+let bgImageReady = false;
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
@@ -49,6 +51,12 @@ function onPersonSelected(person) {
         initVessels(w, h, onVesselSelected);
         initConiunctio(w, h);
         initAtmosphere(w, h);
+        // Load static background for athanor
+        if (!bgImage) {
+            bgImage = new Image();
+            bgImage.onload = () => { bgImageReady = true; };
+            bgImage.src = '/static/images/background.png';
+        }
         athanorParticles = new ParticleSystem({
             count: 50,
             color: '#c8b07a',
@@ -101,17 +109,15 @@ function tick() {
 }
 
 function drawAthanor(ctx, w, h, dt) {
-    // Background — Midjourney video or fallback
-    const bgVid = getBackgroundVideo();
-    if (bgVid) {
-        const vw = bgVid.videoWidth || w;
-        const vh = bgVid.videoHeight || h;
-        const scale = Math.max(w / vw, h / vh);
-        const dw = vw * scale;
-        const dh = vh * scale;
-        ctx.drawImage(bgVid, (w - dw) / 2, (h - dh) / 2, dw, dh);
-        // Darken so vessels and coniunctio pop
-        ctx.fillStyle = 'rgba(6, 6, 18, 0.45)';
+    // Background — static Midjourney image or fallback
+    if (bgImageReady && bgImage) {
+        const iw = bgImage.naturalWidth;
+        const ih = bgImage.naturalHeight;
+        const scale = Math.max(w / iw, h / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        ctx.drawImage(bgImage, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        ctx.fillStyle = 'rgba(6, 6, 18, 0.5)';
         ctx.fillRect(0, 0, w, h);
     } else {
         ctx.fillStyle = COLORS.background;
