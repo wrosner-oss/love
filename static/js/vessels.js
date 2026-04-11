@@ -10,7 +10,7 @@ let videoElements = {};
 let videosReady = false;
 
 // Display size for vessel videos
-const VESSEL_DISPLAY_SIZE = 80;
+const VESSEL_DISPLAY_SIZE = 100;
 
 export function initVessels(w, h, callback) {
     onVesselSelect = callback;

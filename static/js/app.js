@@ -4,6 +4,7 @@ import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMou
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
 import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
 import { showHistory, hideHistory, isHistoryVisible, updateHistory, drawHistory } from './history.js';
+import { showDetail, hideDetail, isDetailVisible, updateDetail, drawDetail } from './detail.js';
 import { initAtmosphere, layoutAtmosphere, updateAtmosphere, drawAtmosphere } from './atmosphere.js';
 import { ParticleSystem } from './particles.js';
 import { COLORS } from './constants.js';
@@ -61,12 +62,10 @@ function onPersonSelected(person) {
 function onVesselSelected(vesselId) {
     const pos = getVesselPosition(vesselId);
     if (pos) {
-        // If clicking the same vessel that already has a flame, hide it
-        if (isFlameActive() && getFlameVesselId() === vesselId) {
-            hideFlame();
-        } else {
-            showFlame(vesselId, pos.x, pos.y);
-        }
+        // Show flame for interaction
+        showFlame(vesselId, pos.x, pos.y);
+        // Show detail panel
+        showDetail(vesselId);
     }
 }
 
@@ -135,9 +134,12 @@ function drawAthanor(ctx, w, h, dt) {
     updateFlame(dt);
     drawFlame(ctx);
 
-    // History overlay (on top of everything)
+    // Overlays (on top of everything)
     updateHistory(dt);
     drawHistory(ctx, w, h);
+
+    updateDetail(dt);
+    drawDetail(ctx, w, h);
 }
 
 function init() {
@@ -151,7 +153,10 @@ function init() {
         if (currentScreen === 'entry') {
             handleEntryClick(x, y);
         } else if (currentScreen === 'athanor' && !isDragging()) {
-            if (isHistoryVisible()) {
+            if (isDetailVisible()) {
+                hideDetail();
+                hideFlame();
+            } else if (isHistoryVisible()) {
                 hideHistory();
             } else {
                 handleVesselClick(x, y);
@@ -169,16 +174,18 @@ function init() {
             if (isDragging()) {
                 handleFlameDrag(x, y);
                 canvas.style.cursor = 'grabbing';
-            } else {
+            } else if (!isDetailVisible() && !isHistoryVisible()) {
                 const hovered = handleVesselMouseMove(x, y);
                 canvas.style.cursor = hovered ? 'pointer' : 'default';
+            } else {
+                canvas.style.cursor = 'default';
             }
         }
     });
 
     // Double-click for history
     canvas.addEventListener('dblclick', (e) => {
-        if (currentScreen === 'athanor') {
+        if (currentScreen === 'athanor' && !isDetailVisible()) {
             if (isHistoryVisible()) {
                 hideHistory();
             } else {
@@ -190,7 +197,7 @@ function init() {
 
     // Mouse down for flame drag
     canvas.addEventListener('mousedown', (e) => {
-        if (currentScreen === 'athanor') {
+        if (currentScreen === 'athanor' && !isDetailVisible() && !isHistoryVisible()) {
             if (handleFlameMouseDown(e.clientX, e.clientY)) {
                 canvas.style.cursor = 'grabbing';
             }
