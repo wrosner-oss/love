@@ -44,7 +44,7 @@ export function drawFlame(ctx) {
     if (!active) return;
 
     const x = vesselX;
-    const baseY = vesselY + 38;
+    const baseY = vesselY + 48;
     const intensity = Math.max(displayLevel, 0.3) / 5; // minimum ember glow
     const height = 8 + intensity * 40;
     const width = 5 + intensity * 16;
@@ -118,7 +118,7 @@ export function drawFlame(ctx) {
 export function handleFlameMouseDown(x, y) {
     if (!active) return false;
     const fx = vesselX;
-    const fy = vesselY + 38;
+    const fy = vesselY + 55;
     const dx = x - fx;
     const dy = y - fy;
     if (Math.abs(dx) < 35 && dy > -70 && dy < 25) {
@@ -132,7 +132,7 @@ export function handleFlameMouseDown(x, y) {
 
 export function handleFlameDrag(x, y) {
     if (!dragging) return;
-    const fy = vesselY + 38;
+    const fy = vesselY + 55;
     const dy = fy - y;
     dragLevel = Math.max(1, Math.min(5, 1 + (dy / 45) * 4));
 }

@@ -6,16 +6,59 @@ let hoveredVessel = null;
 let selectedVessel = null;
 let onVesselSelect = null;
 let time = 0;
+let videoElements = {};
+let videosReady = false;
+
+// Display size for vessel videos
+const VESSEL_DISPLAY_SIZE = 80;
 
 export function initVessels(w, h, callback) {
     onVesselSelect = callback;
     layoutVessels(w, h);
+    loadVideos();
+}
+
+function loadVideos() {
+    let loadedCount = 0;
+    const total = VESSELS.length;
+
+    for (const v of VESSELS) {
+        const video = document.createElement('video');
+        video.src = `/static/images/${v.id}.mp4`;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+        video.style.display = 'none';
+        document.body.appendChild(video);
+
+        video.addEventListener('canplaythrough', () => {
+            loadedCount++;
+            if (loadedCount >= total) videosReady = true;
+            video.play().catch(() => {}); // autoplay may need user interaction
+        }, { once: true });
+
+        // Also try to play immediately (some browsers need this)
+        video.load();
+
+        videoElements[v.id] = video;
+    }
+
+    // Fallback: mark ready after 3 seconds even if not all loaded
+    setTimeout(() => {
+        videosReady = true;
+        // Try playing all videos
+        for (const v of VESSELS) {
+            const vid = videoElements[v.id];
+            if (vid && vid.paused) vid.play().catch(() => {});
+        }
+    }, 3000);
 }
 
 export function layoutVessels(w, h) {
     const cx = w / 2;
     const cy = h / 2;
-    const radius = Math.min(cx, cy) * 0.58;
+    const radius = Math.min(cx, cy) * 0.68;
 
     vesselPositions = VESSELS.map((v, i) => {
         const angle = (i / VESSELS.length) * Math.PI * 2 - Math.PI / 2;
@@ -24,7 +67,7 @@ export function layoutVessels(w, h) {
             ...v,
             x: cx + Math.cos(angle) * (radius + wobble),
             y: cy + Math.sin(angle) * (radius + wobble),
-            baseSize: 32,
+            baseSize: VESSEL_DISPLAY_SIZE / 2,
             angle,
         };
     });
@@ -32,55 +75,6 @@ export function layoutVessels(w, h) {
 
 export function updateVessels(dt) {
     time += dt;
-}
-
-function drawFlaskShape(ctx, x, y, size, variant) {
-    // Each vessel has a slightly different flask shape based on its index
-    ctx.beginPath();
-    const neckW = size * 0.22;
-    const neckH = size * 0.35;
-    const bodyW = size * 0.5;
-    const bodyH = size * 0.45;
-
-    switch (variant % 4) {
-        case 0: // Round-bottom flask
-            ctx.moveTo(-neckW, -size * 0.5);
-            ctx.lineTo(-neckW, -neckH);
-            ctx.quadraticCurveTo(-bodyW, -bodyH * 0.3, -bodyW, bodyH * 0.2);
-            ctx.quadraticCurveTo(-bodyW, bodyH, 0, bodyH * 1.1);
-            ctx.quadraticCurveTo(bodyW, bodyH, bodyW, bodyH * 0.2);
-            ctx.quadraticCurveTo(bodyW, -bodyH * 0.3, neckW, -neckH);
-            ctx.lineTo(neckW, -size * 0.5);
-            break;
-        case 1: // Erlenmeyer / triangular
-            ctx.moveTo(-neckW, -size * 0.5);
-            ctx.lineTo(-neckW, -neckH);
-            ctx.lineTo(-bodyW * 0.9, bodyH * 0.8);
-            ctx.quadraticCurveTo(-bodyW * 0.9, bodyH * 1.1, 0, bodyH * 1.1);
-            ctx.quadraticCurveTo(bodyW * 0.9, bodyH * 1.1, bodyW * 0.9, bodyH * 0.8);
-            ctx.lineTo(neckW, -neckH);
-            ctx.lineTo(neckW, -size * 0.5);
-            break;
-        case 2: // Retort / bulbous
-            ctx.moveTo(-neckW, -size * 0.5);
-            ctx.lineTo(-neckW, -neckH * 0.8);
-            ctx.quadraticCurveTo(-bodyW * 1.1, -bodyH * 0.5, -bodyW * 0.8, bodyH * 0.3);
-            ctx.quadraticCurveTo(-bodyW * 0.5, bodyH * 1.2, 0, bodyH * 1.1);
-            ctx.quadraticCurveTo(bodyW * 0.5, bodyH * 1.2, bodyW * 0.8, bodyH * 0.3);
-            ctx.quadraticCurveTo(bodyW * 1.1, -bodyH * 0.5, neckW, -neckH * 0.8);
-            ctx.lineTo(neckW, -size * 0.5);
-            break;
-        case 3: // Tall narrow
-            ctx.moveTo(-neckW, -size * 0.5);
-            ctx.lineTo(-neckW, -neckH);
-            ctx.quadraticCurveTo(-bodyW * 0.7, -bodyH * 0.2, -bodyW * 0.65, bodyH * 0.4);
-            ctx.quadraticCurveTo(-bodyW * 0.65, bodyH * 1.0, 0, bodyH * 1.1);
-            ctx.quadraticCurveTo(bodyW * 0.65, bodyH * 1.0, bodyW * 0.65, bodyH * 0.4);
-            ctx.quadraticCurveTo(bodyW * 0.7, -bodyH * 0.2, neckW, -neckH);
-            ctx.lineTo(neckW, -size * 0.5);
-            break;
-    }
-    ctx.closePath();
 }
 
 export function drawVessels(ctx, w, h) {
@@ -94,68 +88,76 @@ export function drawVessels(ctx, w, h) {
         const theirLevel = state[other]?.[v.id] || 0;
         const isHovered = hoveredVessel === v.id;
         const isSelected = selectedVessel === v.id;
-        const size = v.baseSize * (isHovered || isSelected ? 1.12 : 1.0);
+        const maxLevel = Math.max(myLevel, theirLevel);
+        const glowIntensity = maxLevel / 5;
 
         // Breathing pulse
         const breathe = 1 + Math.sin(time * 0.8 + i * 0.7) * 0.02;
-        const finalSize = size * breathe;
+        const scale = (isHovered || isSelected ? 1.1 : 1.0) * breathe;
+        const displaySize = VESSEL_DISPLAY_SIZE * scale;
+
+        const video = videoElements[v.id];
+        const hasVideo = video && video.readyState >= 2; // HAVE_CURRENT_DATA
 
         ctx.save();
-        ctx.translate(v.x, v.y);
 
-        // Glow
-        const maxLevel = Math.max(myLevel, theirLevel);
-        const glowIntensity = maxLevel / 5;
+        // Glow effect behind vessel
         if (glowIntensity > 0 || isHovered) {
-            ctx.shadowColor = `hsla(${v.hue}, 60%, 60%, ${0.2 + glowIntensity * 0.3})`;
-            ctx.shadowBlur = 10 + glowIntensity * 15 + (isHovered ? 10 : 0);
+            const glowSize = displaySize * 0.6;
+            const glowAlpha = 0.1 + glowIntensity * 0.2 + (isHovered ? 0.1 : 0);
+            const grad = ctx.createRadialGradient(v.x, v.y, glowSize * 0.2, v.x, v.y, glowSize);
+            grad.addColorStop(0, `hsla(${v.hue}, 60%, 50%, ${glowAlpha})`);
+            grad.addColorStop(1, `hsla(${v.hue}, 60%, 50%, 0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, glowSize, 0, Math.PI * 2);
+            ctx.fill();
         }
 
-        // Draw flask shape
-        drawFlaskShape(ctx, 0, 0, finalSize, i);
+        // Draw video frame or fallback
+        if (hasVideo) {
+            const dx = v.x - displaySize / 2;
+            const dy = v.y - displaySize / 2;
 
-        // Fill with liquid
-        if (myLevel > 0 || theirLevel > 0) {
+            // Circular soft mask — clip to a circle with feathered edge
             ctx.save();
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, displaySize * 0.48, 0, Math.PI * 2);
             ctx.clip();
-
-            const flaskBottom = finalSize * 0.45 * 1.1;
-            const flaskTop = -finalSize * 0.35;
-            const flaskRange = flaskBottom - flaskTop;
-
-            // My liquid
-            if (myLevel > 0) {
-                const myH = (myLevel / 5) * flaskRange;
-                const myColor = person === 'wes' ? COLORS.sol.primary : COLORS.luna.primary;
-                ctx.fillStyle = myColor;
-                ctx.globalAlpha = 0.35 + (myLevel / 5) * 0.2;
-                ctx.fillRect(-finalSize * 0.6, flaskBottom - myH, finalSize * 1.2, myH + 5);
-            }
-
-            // Their liquid (slightly offset for visual separation)
-            if (theirLevel > 0) {
-                const theirH = (theirLevel / 5) * flaskRange;
-                const theirColor = person === 'wes' ? COLORS.luna.primary : COLORS.sol.primary;
-                ctx.fillStyle = theirColor;
-                ctx.globalAlpha = 0.25 + (theirLevel / 5) * 0.15;
-                ctx.fillRect(-finalSize * 0.6, flaskBottom - theirH, finalSize * 1.2, theirH + 5);
-            }
-
+            ctx.globalAlpha = isHovered || isSelected ? 1.0 : 0.9;
+            ctx.drawImage(video, dx, dy, displaySize, displaySize);
             ctx.globalAlpha = 1;
             ctx.restore();
 
-            // Re-draw path for stroke (clip consumed it)
-            drawFlaskShape(ctx, 0, 0, finalSize, i);
+            // Soft edge fade — draw a radial gradient ring to feather the clip edge
+            const fadeGrad = ctx.createRadialGradient(v.x, v.y, displaySize * 0.36, v.x, v.y, displaySize * 0.52);
+            fadeGrad.addColorStop(0, 'rgba(10, 10, 26, 0)');
+            fadeGrad.addColorStop(1, 'rgba(10, 10, 26, 1)');
+            ctx.fillStyle = fadeGrad;
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, displaySize * 0.52, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Fallback: simple glowing circle while videos load
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, displaySize * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${v.hue}, 50%, 40%, 0.3)`;
+            ctx.fill();
+            ctx.strokeStyle = `hsla(${v.hue}, 40%, 55%, 0.5)`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
         }
 
-        // Stroke outline
-        const strokeAlpha = isHovered || isSelected ? 0.9 : 0.45 + glowIntensity * 0.3;
-        ctx.strokeStyle = `hsla(${v.hue}, 40%, 55%, ${strokeAlpha})`;
-        ctx.lineWidth = isSelected ? 2 : 1.2;
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
+        // Selection ring
+        if (isSelected) {
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, displaySize * 0.52, 0, Math.PI * 2);
+            ctx.strokeStyle = `hsla(${v.hue}, 50%, 65%, 0.5)`;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
 
         ctx.restore();
 
@@ -167,13 +169,13 @@ export function drawVessels(ctx, w, h) {
         ctx.fillStyle = `hsla(${v.hue}, 30%, 70%, 1)`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(v.name, v.x, v.y + finalSize * 0.5 + 12);
+        ctx.fillText(v.name, v.x, v.y + displaySize * 0.52 + 6);
 
-        // Essence on hover
+        // Essence on hover/select
         if (isHovered || isSelected) {
             ctx.font = 'italic 10px Georgia, "Cormorant Garamond", serif';
             ctx.fillStyle = `hsla(${v.hue}, 25%, 60%, 0.7)`;
-            ctx.fillText(v.essence, v.x, v.y + finalSize * 0.5 + 28);
+            ctx.fillText(v.essence, v.x, v.y + displaySize * 0.52 + 22);
         }
         ctx.globalAlpha = 1;
         ctx.restore();
@@ -185,7 +187,7 @@ export function handleVesselMouseMove(x, y) {
     for (const v of vesselPositions) {
         const dx = x - v.x;
         const dy = y - v.y;
-        if (Math.sqrt(dx * dx + dy * dy) < v.baseSize + 15) {
+        if (Math.sqrt(dx * dx + dy * dy) < VESSEL_DISPLAY_SIZE * 0.5 + 10) {
             hoveredVessel = v.id;
             return v.id;
         }
