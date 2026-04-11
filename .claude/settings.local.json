@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo $CLAUDE_PLUGIN_ROOT)",
+      "Bash(/Users/wrosner/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.0/lib/brainstorm-server/start-server.sh --project-dir /Users/wrosner/Projects/love)",
+      "Bash(git init:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -m pytest tests/test_server.py -v)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(between us.\" fades in, then Sun and Moon glyphs appear for Wes and Amelia.:*)"
+    ]
+  }
+}
