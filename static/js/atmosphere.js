@@ -66,7 +66,7 @@ const STREAM_COUNT = 30;
 export function initAtmosphere(w, h) {
     cx = w / 2;
     cy = h / 2;
-    vesselRadius = Math.min(w, h) * 0.58 * 0.5; // match vessel layout radius
+    vesselRadius = Math.min(w * 0.72, h * 0.68) * 0.5; // match elliptical vessel layout
 
     streams = [];
     for (let i = 0; i < STREAM_COUNT; i++) {
@@ -77,7 +77,7 @@ export function initAtmosphere(w, h) {
 export function layoutAtmosphere(w, h) {
     cx = w / 2;
     cy = h / 2;
-    vesselRadius = Math.min(w, h) * 0.58 * 0.5;
+    vesselRadius = Math.min(w * 0.72, h * 0.68) * 0.5;
 }
 
 function createStream(w, h) {

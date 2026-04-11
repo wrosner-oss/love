@@ -58,15 +58,17 @@ function loadVideos() {
 export function layoutVessels(w, h) {
     const cx = w / 2;
     const cy = h / 2;
-    const radius = Math.min(cx, cy) * 0.68;
+    // Elliptical layout — wider than tall to match widescreen
+    const radiusX = cx * 0.72;
+    const radiusY = cy * 0.68;
 
     vesselPositions = VESSELS.map((v, i) => {
         const angle = (i / VESSELS.length) * Math.PI * 2 - Math.PI / 2;
-        const wobble = Math.sin(i * 2.7) * 6;
+        const wobble = Math.sin(i * 2.7) * 5;
         return {
             ...v,
-            x: cx + Math.cos(angle) * (radius + wobble),
-            y: cy + Math.sin(angle) * (radius + wobble),
+            x: cx + Math.cos(angle) * (radiusX + wobble),
+            y: cy + Math.sin(angle) * (radiusY + wobble),
             baseSize: VESSEL_DISPLAY_SIZE / 2,
             angle,
         };
