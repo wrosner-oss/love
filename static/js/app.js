@@ -1,5 +1,5 @@
 import { setPerson, fetchState } from './state.js';
-import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove } from './entry.js';
+import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove, getBackgroundVideo } from './entry.js';
 import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
 import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
@@ -101,13 +101,26 @@ function tick() {
 }
 
 function drawAthanor(ctx, w, h, dt) {
-    // Background
-    ctx.fillStyle = COLORS.background;
-    ctx.fillRect(0, 0, w, h);
+    // Background — Midjourney video or fallback
+    const bgVid = getBackgroundVideo();
+    if (bgVid) {
+        const vw = bgVid.videoWidth || w;
+        const vh = bgVid.videoHeight || h;
+        const scale = Math.max(w / vw, h / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        ctx.drawImage(bgVid, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        // Darken so vessels and coniunctio pop
+        ctx.fillStyle = 'rgba(6, 6, 18, 0.45)';
+        ctx.fillRect(0, 0, w, h);
+    } else {
+        ctx.fillStyle = COLORS.background;
+        ctx.fillRect(0, 0, w, h);
+    }
 
-    // Subtle center warmth
+    // Subtle center warmth (on top of background)
     const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.45);
-    grad.addColorStop(0, 'rgba(35, 28, 45, 0.4)');
+    grad.addColorStop(0, 'rgba(35, 28, 45, 0.3)');
     grad.addColorStop(1, 'rgba(10, 10, 26, 0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);

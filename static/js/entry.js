@@ -12,18 +12,28 @@ let hoverSymbol = null;
 let hoverScale = { wes: 1, amelia: 1 };
 let clickFlash = { wes: 0, amelia: 0 };
 
+// Midjourney art assets
+let bgVideo = null;
+let bgReady = false;
+let solImg = null;
+let lunaImg = null;
+let solReady = false;
+let lunaReady = false;
+
+const SYMBOL_SIZE = 90; // display size for Sol/Luna images
+
 const symbols = [
-    { id: 'wes', glyph: '\u2609', name: 'Wes', color: COLORS.sol.primary, glowColor: COLORS.sol.glow, x: 0, y: 0 },
-    { id: 'amelia', glyph: '\u263D', name: 'Amelia', color: COLORS.luna.primary, glowColor: COLORS.luna.glow, x: 0, y: 0 },
+    { id: 'wes', name: 'Wes', color: COLORS.sol.primary, glowColor: COLORS.sol.glow, x: 0, y: 0 },
+    { id: 'amelia', name: 'Amelia', color: COLORS.luna.primary, glowColor: COLORS.luna.glow, x: 0, y: 0 },
 ];
 
 export function initEntry(w, h, callback) {
     onSelect = callback;
     particles = new ParticleSystem({
-        count: 80,
+        count: 60,
         color: '#d4b87a',
-        maxAlpha: 0.5,
-        speed: 0.2,
+        maxAlpha: 0.35,
+        speed: 0.15,
     });
     particles.resize(w, h);
     fadeState = 'waiting';
@@ -34,12 +44,41 @@ export function initEntry(w, h, callback) {
     hoverScale = { wes: 1, amelia: 1 };
     clickFlash = { wes: 0, amelia: 0 };
     layoutSymbols(w, h);
+    loadAssets();
+}
+
+function loadAssets() {
+    // Background video
+    bgVideo = document.createElement('video');
+    bgVideo.src = '/static/images/background.mp4';
+    bgVideo.loop = true;
+    bgVideo.muted = true;
+    bgVideo.playsInline = true;
+    bgVideo.preload = 'auto';
+    bgVideo.style.display = 'none';
+    document.body.appendChild(bgVideo);
+    bgVideo.addEventListener('canplaythrough', () => {
+        bgReady = true;
+        bgVideo.play().catch(() => {});
+    }, { once: true });
+    bgVideo.load();
+    setTimeout(() => { bgReady = true; bgVideo.play().catch(() => {}); }, 3000);
+
+    // Sol image
+    solImg = new Image();
+    solImg.onload = () => { solReady = true; };
+    solImg.src = '/static/images/sol.png';
+
+    // Luna image
+    lunaImg = new Image();
+    lunaImg.onload = () => { lunaReady = true; };
+    lunaImg.src = '/static/images/luna.png';
 }
 
 function layoutSymbols(w, h) {
     const cx = w / 2;
     const cy = h * 0.58;
-    const gap = Math.min(140, w * 0.12);
+    const gap = Math.min(180, w * 0.15);
     symbols[0].x = cx - gap;
     symbols[0].y = cy;
     symbols[1].x = cx + gap;
@@ -71,26 +110,36 @@ export function updateEntry(dt) {
         if (symbolsAlpha >= 0.99) fadeState = 'ready';
     }
 
-    // Smooth hover scale
     for (const s of symbols) {
-        const target = hoverSymbol === s.id ? 1.15 : 1.0;
+        const target = hoverSymbol === s.id ? 1.12 : 1.0;
         hoverScale[s.id] += (target - hoverScale[s.id]) * 0.1;
-        // Decay click flash
         clickFlash[s.id] *= 0.92;
     }
 }
 
 export function drawEntry(ctx, w, h) {
-    // Background
-    ctx.fillStyle = COLORS.background;
-    ctx.fillRect(0, 0, w, h);
+    // Background — Midjourney video or fallback
+    if (bgReady && bgVideo && bgVideo.readyState >= 2) {
+        // Draw video covering the full canvas, maintaining aspect ratio
+        const vw = bgVideo.videoWidth || w;
+        const vh = bgVideo.videoHeight || h;
+        const scale = Math.max(w / vw, h / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        ctx.drawImage(bgVideo, (w - dw) / 2, (h - dh) / 2, dw, dh);
 
-    // Subtle radial warmth in center
-    const grad = ctx.createRadialGradient(w / 2, h * 0.48, 0, w / 2, h * 0.48, h * 0.5);
-    grad.addColorStop(0, 'rgba(30, 25, 40, 0.6)');
-    grad.addColorStop(1, 'rgba(10, 10, 26, 0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
+        // Darken slightly so text/symbols pop
+        ctx.fillStyle = 'rgba(6, 6, 18, 0.35)';
+        ctx.fillRect(0, 0, w, h);
+    } else {
+        ctx.fillStyle = COLORS.background;
+        ctx.fillRect(0, 0, w, h);
+        const grad = ctx.createRadialGradient(w / 2, h * 0.48, 0, w / 2, h * 0.48, h * 0.5);
+        grad.addColorStop(0, 'rgba(30, 25, 40, 0.6)');
+        grad.addColorStop(1, 'rgba(10, 10, 26, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+    }
 
     particles.draw(ctx);
 
@@ -98,11 +147,16 @@ export function drawEntry(ctx, w, h) {
     if (textAlpha > 0) {
         ctx.save();
         ctx.globalAlpha = textAlpha;
-        ctx.font = 'italic 300 32px Georgia, "Cormorant Garamond", serif';
-        ctx.fillStyle = '#e0c882';
+        ctx.font = 'italic 300 34px Georgia, "Cormorant Garamond", serif';
+        ctx.fillStyle = '#e8d090';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('For the alchemy between us.', w / 2, h * 0.40);
+
+        // Subtle text shadow for readability over background
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 12;
+        ctx.fillText('For the alchemy between us.', w / 2, h * 0.38);
+        ctx.shadowBlur = 0;
         ctx.restore();
     }
 
@@ -114,6 +168,9 @@ export function drawEntry(ctx, w, h) {
         for (const s of symbols) {
             const scale = hoverScale[s.id];
             const flash = clickFlash[s.id];
+            const isSol = s.id === 'wes';
+            const img = isSol ? solImg : lunaImg;
+            const imgReady = isSol ? solReady : lunaReady;
 
             ctx.save();
             ctx.translate(s.x, s.y);
@@ -121,32 +178,54 @@ export function drawEntry(ctx, w, h) {
 
             // Glow on hover/click
             if (hoverSymbol === s.id || flash > 0.01) {
-                const glowIntensity = Math.max(hoverSymbol === s.id ? 0.15 : 0, flash * 0.4);
-                ctx.shadowColor = s.glowColor;
-                ctx.shadowBlur = 30 + flash * 40;
-                ctx.globalAlpha = symbolsAlpha * (0.5 + glowIntensity);
+                const glowIntensity = Math.max(hoverSymbol === s.id ? 0.2 : 0, flash * 0.5);
+                const glowGrad = ctx.createRadialGradient(0, 0, SYMBOL_SIZE * 0.2, 0, 0, SYMBOL_SIZE * 0.7);
+                glowGrad.addColorStop(0, s.glowColor);
+                glowGrad.addColorStop(1, 'transparent');
+                ctx.globalAlpha = symbolsAlpha * glowIntensity;
+                ctx.fillStyle = glowGrad;
                 ctx.beginPath();
-                ctx.arc(0, 5, 35, 0, Math.PI * 2);
-                ctx.fillStyle = s.glowColor;
-                ctx.globalAlpha = glowIntensity * 0.15;
+                ctx.arc(0, 0, SYMBOL_SIZE * 0.7, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
                 ctx.globalAlpha = symbolsAlpha;
             }
 
-            // Glyph
-            ctx.font = '72px serif';
-            ctx.fillStyle = s.color;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(s.glyph, 0, -5);
+            // Draw Midjourney image or fallback glyph
+            if (imgReady && img) {
+                const halfSize = SYMBOL_SIZE / 2;
+                // Circular clip with soft fade
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(0, 0, halfSize * 0.92, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(img, -halfSize, -halfSize, SYMBOL_SIZE, SYMBOL_SIZE);
+                ctx.restore();
+                // Soft edge fade
+                const fadeGrad = ctx.createRadialGradient(0, 0, halfSize * 0.7, 0, 0, halfSize);
+                fadeGrad.addColorStop(0, 'rgba(0,0,0,0)');
+                fadeGrad.addColorStop(1, bgReady ? 'rgba(6,6,18,0.8)' : COLORS.background);
+                ctx.fillStyle = fadeGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, halfSize, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Fallback Unicode glyph
+                ctx.font = '72px serif';
+                ctx.fillStyle = s.color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(isSol ? '\u2609' : '\u263D', 0, -5);
+            }
 
-            // Name
-            ctx.font = '200 14px -apple-system, "Raleway", sans-serif';
+            // Name below
+            ctx.font = '200 13px -apple-system, "Raleway", sans-serif';
             ctx.fillStyle = s.color;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(s.name.toUpperCase(), 0, 30);
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 6;
+            ctx.fillText(s.name.toUpperCase(), 0, SYMBOL_SIZE / 2 + 8);
+            ctx.shadowBlur = 0;
 
             ctx.restore();
         }
@@ -160,10 +239,9 @@ export function handleEntryClick(x, y) {
     for (const s of symbols) {
         const dx = x - s.x;
         const dy = y - s.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 55) {
+        if (Math.sqrt(dx * dx + dy * dy) < SYMBOL_SIZE * 0.6) {
             clickFlash[s.id] = 1;
             if (onSelect) {
-                // Brief delay so the flash is visible
                 setTimeout(() => onSelect(s.id), 300);
             }
             return;
@@ -181,11 +259,16 @@ export function handleEntryMouseMove(x, y, canvas) {
     for (const s of symbols) {
         const dx = x - s.x;
         const dy = y - s.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 55) {
+        if (Math.sqrt(dx * dx + dy * dy) < SYMBOL_SIZE * 0.6) {
             hoverSymbol = s.id;
             canvas.style.cursor = 'pointer';
             return;
         }
     }
     canvas.style.cursor = 'default';
+}
+
+// Export background video so the athanor screen can reuse it
+export function getBackgroundVideo() {
+    return bgReady && bgVideo && bgVideo.readyState >= 2 ? bgVideo : null;
 }
