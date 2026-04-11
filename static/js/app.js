@@ -3,6 +3,7 @@ import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handl
 import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
 import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
+import { showHistory, hideHistory, isHistoryVisible, updateHistory, drawHistory } from './history.js';
 import { ParticleSystem } from './particles.js';
 import { COLORS } from './constants.js';
 
@@ -126,6 +127,10 @@ function drawAthanor(ctx, w, h, dt) {
     // Update & draw flame
     updateFlame(dt);
     drawFlame(ctx);
+
+    // History overlay (on top of everything)
+    updateHistory(dt);
+    drawHistory(ctx, w, h);
 }
 
 function init() {
@@ -139,7 +144,11 @@ function init() {
         if (currentScreen === 'entry') {
             handleEntryClick(x, y);
         } else if (currentScreen === 'athanor' && !isDragging()) {
-            handleVesselClick(x, y);
+            if (isHistoryVisible()) {
+                hideHistory();
+            } else {
+                handleVesselClick(x, y);
+            }
         }
     });
 
@@ -156,6 +165,18 @@ function init() {
             } else {
                 const hovered = handleVesselMouseMove(x, y);
                 canvas.style.cursor = hovered ? 'pointer' : 'default';
+            }
+        }
+    });
+
+    // Double-click for history
+    canvas.addEventListener('dblclick', (e) => {
+        if (currentScreen === 'athanor') {
+            if (isHistoryVisible()) {
+                hideHistory();
+            } else {
+                const hit = handleVesselMouseMove(e.clientX, e.clientY);
+                if (hit) showHistory(hit);
             }
         }
     });
