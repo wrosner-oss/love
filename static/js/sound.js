@@ -23,20 +23,31 @@ function ensureContext() {
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         masterGain = audioCtx.createGain();
-        masterGain.gain.value = 0.12; // Quiet — ambient, not intrusive
+        masterGain.gain.value = 0.08; // Very quiet — ambient background
         masterGain.connect(audioCtx.destination);
 
-        // Drone — two oscillators creating a warm pad
+        // Drone — two oscillators with LFO modulation for breathing feel
         droneGain = audioCtx.createGain();
         droneGain.gain.value = 0;
         droneGain.connect(masterGain);
+
+        // LFO to modulate drone volume — slow breathing
+        const lfo = audioCtx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.08; // Very slow — one breath every ~12 seconds
+        const lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 0.3; // Modulation depth — 30% volume swing
+        lfo.connect(lfoGain);
+        lfoGain.connect(droneGain.gain);
+        lfo.start();
 
         droneOsc1 = audioCtx.createOscillator();
         droneOsc1.type = 'sine';
         droneOsc1.frequency.value = DRONE_BASE;
         const droneFilter1 = audioCtx.createBiquadFilter();
         droneFilter1.type = 'lowpass';
-        droneFilter1.frequency.value = 400;
+        droneFilter1.frequency.value = 300; // Warmer, less buzzy
+        droneFilter1.Q.value = 0.5;
         droneOsc1.connect(droneFilter1);
         droneFilter1.connect(droneGain);
         droneOsc1.start();
@@ -46,10 +57,21 @@ function ensureContext() {
         droneOsc2.frequency.value = DRONE_FIFTH;
         const droneFilter2 = audioCtx.createBiquadFilter();
         droneFilter2.type = 'lowpass';
-        droneFilter2.frequency.value = 350;
+        droneFilter2.frequency.value = 280;
+        droneFilter2.Q.value = 0.5;
         droneOsc2.connect(droneFilter2);
         droneFilter2.connect(droneGain);
         droneOsc2.start();
+
+        // Third oscillator — sub octave for depth, very quiet
+        const droneOsc3 = audioCtx.createOscillator();
+        droneOsc3.type = 'sine';
+        droneOsc3.frequency.value = DRONE_BASE / 2; // Sub octave
+        const subGain = audioCtx.createGain();
+        subGain.gain.value = 0.3;
+        droneOsc3.connect(subGain);
+        subGain.connect(droneGain);
+        droneOsc3.start();
 
         initialized = true;
         return true;
@@ -69,7 +91,7 @@ export function startAudio() {
 export function toggleMute() {
     muted = !muted;
     if (masterGain) {
-        masterGain.gain.setTargetAtTime(muted ? 0 : 0.12, audioCtx.currentTime, 0.3);
+        masterGain.gain.setTargetAtTime(muted ? 0 : 0.08, audioCtx.currentTime, 0.3);
     }
     return muted;
 }

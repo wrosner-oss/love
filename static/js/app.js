@@ -73,11 +73,15 @@ function onPersonSelected(person) {
 function onVesselSelected(vesselId) {
     const pos = getVesselPosition(vesselId);
     if (pos) {
-        showFlame(vesselId, pos.x, pos.y);
-        showDetail(vesselId);
-        // Play chime tuned to this vessel's hue
-        const vessel = VESSELS.find(v => v.id === vesselId);
-        if (vessel) playChime(vessel.hue);
+        // Single click: show flame for adjusting
+        if (isFlameActive() && getFlameVesselId() === vesselId) {
+            // Clicking same vessel again: toggle flame off
+            hideFlame();
+        } else {
+            showFlame(vesselId, pos.x, pos.y);
+            const vessel = VESSELS.find(v => v.id === vesselId);
+            if (vessel) playChime(vessel.hue);
+        }
     }
 }
 
@@ -187,20 +191,10 @@ function init() {
         if (currentScreen === 'entry') {
             handleEntryClick(x, y);
         } else if (currentScreen === 'athanor' && !isDragging()) {
-            if (isHistoryVisible()) {
+            if (isDetailVisible()) {
+                hideDetail();
+            } else if (isHistoryVisible()) {
                 hideHistory();
-            } else if (isDetailVisible()) {
-                // Check if clicking a different vessel while detail is open
-                const hit = handleVesselMouseMove(x, y);
-                if (hit && hit !== getFlameVesselId()) {
-                    // Switch to the new vessel
-                    handleVesselClick(x, y);
-                } else if (!hit) {
-                    // Clicked empty space — close the panel
-                    hideDetail();
-                    hideFlame();
-                }
-                // If clicking the same vessel, do nothing (flame is already there)
             } else {
                 handleVesselClick(x, y);
             }
@@ -231,14 +225,17 @@ function init() {
         }
     });
 
-    // Double-click for history
+    // Double-click for detail panel
     canvas.addEventListener('dblclick', (e) => {
-        if (currentScreen === 'athanor' && !isDetailVisible()) {
-            if (isHistoryVisible()) {
-                hideHistory();
+        if (currentScreen === 'athanor') {
+            if (isDetailVisible()) {
+                hideDetail();
             } else {
                 const hit = handleVesselMouseMove(e.clientX, e.clientY);
-                if (hit) showHistory(hit);
+                if (hit) {
+                    showDetail(hit);
+                    showFlame(hit, getVesselPosition(hit).x, getVesselPosition(hit).y);
+                }
             }
         }
     });
