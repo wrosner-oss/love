@@ -4,6 +4,7 @@ import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMou
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
 import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
 import { showHistory, hideHistory, isHistoryVisible, updateHistory, drawHistory } from './history.js';
+import { initAtmosphere, layoutAtmosphere, updateAtmosphere, drawAtmosphere } from './atmosphere.js';
 import { ParticleSystem } from './particles.js';
 import { COLORS } from './constants.js';
 
@@ -32,6 +33,7 @@ function resize() {
     if (currentScreen === 'athanor') {
         layoutVessels(w, h);
         layoutConiunctio(w, h);
+        layoutAtmosphere(w, h);
         if (athanorParticles) athanorParticles.resize(w, h);
     }
 }
@@ -45,6 +47,7 @@ function onPersonSelected(person) {
     fetchState().then(() => {
         initVessels(w, h, onVesselSelected);
         initConiunctio(w, h);
+        initAtmosphere(w, h);
         athanorParticles = new ParticleSystem({
             count: 50,
             color: '#c8b07a',
@@ -115,6 +118,10 @@ function drawAthanor(ctx, w, h, dt) {
         athanorParticles.update();
         athanorParticles.draw(ctx);
     }
+
+    // Atmospheric energy field
+    updateAtmosphere(dt);
+    drawAtmosphere(ctx, w, h);
 
     // Center visualization
     updateConiunctio(dt);
