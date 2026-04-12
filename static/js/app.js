@@ -61,7 +61,7 @@ function onPersonSelected(person) {
         if (!bgImage) {
             bgImage = new Image();
             bgImage.onload = () => { bgImageReady = true; };
-            bgImage.src = '/static/images/background.png';
+            bgImage.src = '/static/images/background2.png';
         }
         athanorParticles = new ParticleSystem({
             count: 50,

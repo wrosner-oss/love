@@ -67,7 +67,7 @@ function loadAssets() {
 function layoutSymbols(w, h) {
     const cx = w / 2;
     const cy = h * 0.52;
-    const gap = Math.min(120, w * 0.09);
+    const gap = Math.min(90, w * 0.065);
     symbols[0].x = cx - gap;
     symbols[0].y = cy;
     symbols[1].x = cx + gap;
