@@ -66,8 +66,8 @@ function loadAssets() {
 
 function layoutSymbols(w, h) {
     const cx = w / 2;
-    const cy = h * 0.58;
-    const gap = Math.min(180, w * 0.15);
+    const cy = h * 0.50;
+    const gap = Math.min(160, w * 0.13);
     symbols[0].x = cx - gap;
     symbols[0].y = cy;
     symbols[1].x = cx + gap;
@@ -142,7 +142,7 @@ export function drawEntry(ctx, w, h) {
 
         ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
         ctx.shadowBlur = 12;
-        ctx.fillText('Step Inside', w / 2, h * 0.38);
+        ctx.fillText('Step Inside', w / 2, h * 0.35);
         ctx.shadowBlur = 0;
         ctx.restore();
     }
