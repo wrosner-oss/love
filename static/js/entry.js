@@ -155,7 +155,7 @@ export function drawEntry(ctx, w, h) {
         // Subtle text shadow for readability over background
         ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
         ctx.shadowBlur = 12;
-        ctx.fillText('For the alchemy between us.', w / 2, h * 0.38);
+        ctx.fillText('Step Inside', w / 2, h * 0.38);
         ctx.shadowBlur = 0;
         ctx.restore();
     }

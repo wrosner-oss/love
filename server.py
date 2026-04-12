@@ -35,6 +35,11 @@ def init_db():
         db.executescript(f.read().decode('utf8'))
 
 
+# Auto-initialize DB on startup (works with gunicorn)
+with app.app_context():
+    init_db()
+
+
 @app.route('/')
 def index():
     return send_from_directory('templates', 'index.html')
