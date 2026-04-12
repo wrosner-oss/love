@@ -59,8 +59,8 @@ export function layoutVessels(w, h) {
     const cx = w / 2;
     const cy = h / 2;
     // Elliptical layout — wider than tall to match widescreen
-    const radiusX = cx * 0.72;
-    const radiusY = cy * 0.68;
+    const radiusX = cx * 0.78;
+    const radiusY = cy * 0.76;
 
     vesselPositions = VESSELS.map((v, i) => {
         const angle = (i / VESSELS.length) * Math.PI * 2 - Math.PI / 2;
