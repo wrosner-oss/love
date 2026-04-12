@@ -1,0 +1,10 @@
+athanor.db
+__pycache__
+*.pyc
+.git
+.gitignore
+.superpowers
+.claude
+docs
+tests
+.pytest_cache

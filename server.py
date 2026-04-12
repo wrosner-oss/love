@@ -3,7 +3,9 @@ import sqlite3
 from flask import Flask, g, jsonify, request, send_from_directory
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.config['DATABASE'] = os.path.join(app.root_path, 'athanor.db')
+DATA_DIR = os.environ.get('DATA_DIR', app.root_path)
+os.makedirs(DATA_DIR, exist_ok=True)
+app.config['DATABASE'] = os.path.join(DATA_DIR, 'athanor.db')
 
 VALID_PERSONS = {'wes', 'amelia'}
 VALID_VESSELS = {
@@ -91,5 +93,5 @@ def get_history(vessel):
 if __name__ == '__main__':
     with app.app_context():
         init_db()
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5555))
     app.run(debug=True, port=port)
