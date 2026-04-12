@@ -7,6 +7,7 @@ import { showHistory, hideHistory, isHistoryVisible, updateHistory, drawHistory 
 import { showDetail, hideDetail, isDetailVisible, updateDetail, drawDetail } from './detail.js';
 import { initAtmosphere, layoutAtmosphere, updateAtmosphere, drawAtmosphere } from './atmosphere.js';
 import { startAudio, startDrone, updateDrone, playChime, playBurst, toggleMute, isMuted } from './sound.js';
+import { layoutStory, updateStory, drawStory, handleStoryClick, handleStoryMouseMove, handleStoryScroll, isStoryVisible } from './story.js';
 import { ParticleSystem } from './particles.js';
 import { COLORS, VESSELS } from './constants.js';
 
@@ -38,6 +39,7 @@ function resize() {
         layoutVessels(w, h);
         layoutConiunctio(w, h);
         layoutAtmosphere(w, h);
+        layoutStory(w, h);
         if (athanorParticles) athanorParticles.resize(w, h);
     }
 }
@@ -54,6 +56,7 @@ function onPersonSelected(person) {
         initVessels(w, h, onVesselSelected);
         initConiunctio(w, h);
         initAtmosphere(w, h);
+        layoutStory(w, h);
         // Load static background for athanor
         if (!bgImage) {
             bgImage = new Image();
@@ -178,6 +181,10 @@ function drawAthanor(ctx, w, h, dt) {
 
     updateDetail(dt);
     drawDetail(ctx, w, h);
+
+    // Story — the hidden maker's mark (topmost layer)
+    updateStory(dt);
+    drawStory(ctx, w, h);
 }
 
 function init() {
@@ -191,10 +198,14 @@ function init() {
         if (currentScreen === 'entry') {
             handleEntryClick(x, y);
         } else if (currentScreen === 'athanor' && !isDragging()) {
-            if (isDetailVisible()) {
+            if (isStoryVisible()) {
+                handleStoryClick(x, y);
+            } else if (isDetailVisible()) {
                 hideDetail();
             } else if (isHistoryVisible()) {
                 hideHistory();
+            } else if (handleStoryClick(x, y)) {
+                // Story icon was clicked — handled
             } else {
                 handleVesselClick(x, y);
             }
@@ -211,12 +222,14 @@ function init() {
             if (isDragging()) {
                 handleFlameDrag(x, y);
                 canvas.style.cursor = 'grabbing';
+            } else if (isStoryVisible()) {
+                canvas.style.cursor = 'default';
             } else {
+                const storyHover = handleStoryMouseMove(x, y);
                 const hovered = handleVesselMouseMove(x, y);
-                if (hovered) {
+                if (storyHover || hovered) {
                     canvas.style.cursor = 'pointer';
                 } else if (isFlameActive()) {
-                    // Check if hovering over flame area
                     canvas.style.cursor = 'grab';
                 } else {
                     canvas.style.cursor = 'default';
@@ -256,6 +269,14 @@ function init() {
             canvas.style.cursor = 'default';
         }
     });
+
+    // Scroll for story panel
+    canvas.addEventListener('wheel', (e) => {
+        if (currentScreen === 'athanor' && isStoryVisible()) {
+            handleStoryScroll(e.deltaY);
+            e.preventDefault();
+        }
+    }, { passive: false });
 
     initEntry(w, h, onPersonSelected);
 
