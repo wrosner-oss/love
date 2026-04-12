@@ -1,77 +1,90 @@
 // Ambient sound system for The Athanor
-// Uses Web Audio API — no audio files needed
+// Uses Web Audio API — sound mirrors the coniunctio state
+//
+// Harmonious: rich, warm, consonant — octaves and fifths, smooth sine waves
+// Balanced:   pleasant movement — intervals shift slowly, gentle tension
+// Searching:  sparse, minor intervals — ache and longing, rougher texture
+// Dormant:    barely there — single low pulse, felt more than heard
 
 let audioCtx = null;
 let masterGain = null;
-let droneOsc1 = null;
-let droneOsc2 = null;
-let droneGain = null;
 let initialized = false;
 let muted = false;
 
-// Drone frequencies based on alignment
-const DRONE_BASE = 110; // A2 — warm, grounding
-const DRONE_FIFTH = 165; // E3 — perfect fifth, harmonious
+// --- Drone layers ---
+// Each layer has: oscillator, gain, filter
+// We crossfade layers based on alignment state
+let layers = {};
+let droneGain = null; // master drone gain
 
-export function initSound() {
-    // Audio context must be created from a user gesture
-    // We'll initialize on first interaction
-}
+// Current smooth alignment for sound (tracks separately for audio smoothing)
+let soundAlignment = 0.5;
+
+// Musical constants
+const A2 = 110;
+const E3 = 164.81;  // perfect fifth
+const C3 = 130.81;  // minor third above A
+const D3 = 146.83;  // fourth
+const A3 = 220;
+const F3 = 174.61;  // minor sixth — yearning interval
+
+export function initSound() {}
 
 function ensureContext() {
     if (initialized) return true;
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         masterGain = audioCtx.createGain();
-        masterGain.gain.value = 0.08; // Very quiet — ambient background
+        masterGain.gain.value = 0.07;
         masterGain.connect(audioCtx.destination);
 
-        // Drone — two oscillators with LFO modulation for breathing feel
         droneGain = audioCtx.createGain();
         droneGain.gain.value = 0;
         droneGain.connect(masterGain);
 
-        // LFO to modulate drone volume — slow breathing
+        // --- LFO for breathing ---
         const lfo = audioCtx.createOscillator();
         lfo.type = 'sine';
-        lfo.frequency.value = 0.08; // Very slow — one breath every ~12 seconds
+        lfo.frequency.value = 0.06; // ~16 second breath cycle
         const lfoGain = audioCtx.createGain();
-        lfoGain.gain.value = 0.3; // Modulation depth — 30% volume swing
+        lfoGain.gain.value = 0.2;
         lfo.connect(lfoGain);
         lfoGain.connect(droneGain.gain);
         lfo.start();
 
-        droneOsc1 = audioCtx.createOscillator();
-        droneOsc1.type = 'sine';
-        droneOsc1.frequency.value = DRONE_BASE;
-        const droneFilter1 = audioCtx.createBiquadFilter();
-        droneFilter1.type = 'lowpass';
-        droneFilter1.frequency.value = 300; // Warmer, less buzzy
-        droneFilter1.Q.value = 0.5;
-        droneOsc1.connect(droneFilter1);
-        droneFilter1.connect(droneGain);
-        droneOsc1.start();
+        // --- HARMONIOUS layer ---
+        // Rich, warm: root + fifth + octave, pure sine waves
+        layers.harmonious = createLayer([
+            { freq: A2, type: 'sine', gain: 0.35 },
+            { freq: E3, type: 'sine', gain: 0.25 },      // perfect fifth
+            { freq: A3, type: 'sine', gain: 0.15 },      // octave
+            { freq: A2 / 2, type: 'sine', gain: 0.2 },   // sub octave — deep warmth
+        ], 350, 0.7);
 
-        droneOsc2 = audioCtx.createOscillator();
-        droneOsc2.type = 'sine';
-        droneOsc2.frequency.value = DRONE_FIFTH;
-        const droneFilter2 = audioCtx.createBiquadFilter();
-        droneFilter2.type = 'lowpass';
-        droneFilter2.frequency.value = 280;
-        droneFilter2.Q.value = 0.5;
-        droneOsc2.connect(droneFilter2);
-        droneFilter2.connect(droneGain);
-        droneOsc2.start();
+        // --- BALANCED layer ---
+        // Movement and gentle tension: root + fourth + shifting tone
+        layers.balanced = createLayer([
+            { freq: A2, type: 'sine', gain: 0.3 },
+            { freq: D3, type: 'triangle', gain: 0.2 },   // fourth — stable but not resolved
+            { freq: E3, type: 'sine', gain: 0.12 },      // fifth fading in and out
+            { freq: A2 * 1.01, type: 'sine', gain: 0.1 }, // very slight detune — shimmer
+        ], 320, 0.5);
 
-        // Third oscillator — sub octave for depth, very quiet
-        const droneOsc3 = audioCtx.createOscillator();
-        droneOsc3.type = 'sine';
-        droneOsc3.frequency.value = DRONE_BASE / 2; // Sub octave
-        const subGain = audioCtx.createGain();
-        subGain.gain.value = 0.3;
-        droneOsc3.connect(subGain);
-        subGain.connect(droneGain);
-        droneOsc3.start();
+        // --- SEARCHING layer ---
+        // Sparse, minor, aching: root + minor sixth + rougher texture
+        layers.searching = createLayer([
+            { freq: A2, type: 'triangle', gain: 0.25 },   // triangle — more overtones, rougher
+            { freq: F3, type: 'triangle', gain: 0.2 },    // minor sixth — yearning
+            { freq: C3, type: 'sine', gain: 0.12 },       // minor third — melancholy
+            { freq: A2 * 0.995, type: 'sine', gain: 0.08 }, // slight detune down — unease
+        ], 250, 0.4);
+
+        // --- DORMANT layer ---
+        // Almost nothing: single sub tone, very filtered
+        layers.dormant = createLayer([
+            { freq: A2 / 2, type: 'sine', gain: 0.3 },   // deep sub
+            { freq: A2, type: 'sine', gain: 0.05 },       // whisper of root
+        ], 150, 0.3);
 
         initialized = true;
         return true;
@@ -80,7 +93,33 @@ function ensureContext() {
     }
 }
 
-// Call this from any user interaction to start the audio context
+function createLayer(oscillators, filterFreq, filterQ) {
+    const layerGain = audioCtx.createGain();
+    layerGain.gain.value = 0; // starts silent
+    layerGain.connect(droneGain);
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = filterFreq;
+    filter.Q.value = filterQ;
+    filter.connect(layerGain);
+
+    const oscs = [];
+    for (const def of oscillators) {
+        const osc = audioCtx.createOscillator();
+        osc.type = def.type;
+        osc.frequency.value = def.freq;
+        const g = audioCtx.createGain();
+        g.gain.value = def.gain;
+        osc.connect(g);
+        g.connect(filter);
+        osc.start();
+        oscs.push({ osc, gain: g, basFreq: def.freq });
+    }
+
+    return { gain: layerGain, filter, oscs };
+}
+
 export function startAudio() {
     if (!ensureContext()) return;
     if (audioCtx.state === 'suspended') {
@@ -91,17 +130,16 @@ export function startAudio() {
 export function toggleMute() {
     muted = !muted;
     if (masterGain) {
-        masterGain.gain.setTargetAtTime(muted ? 0 : 0.08, audioCtx.currentTime, 0.3);
+        masterGain.gain.setTargetAtTime(muted ? 0 : 0.07, audioCtx.currentTime, 0.3);
     }
     return muted;
 }
 
 export function isMuted() { return muted; }
 
-// Fade drone in/out
 export function startDrone() {
     if (!initialized || muted) return;
-    droneGain.gain.setTargetAtTime(1.0, audioCtx.currentTime, 1.5);
+    droneGain.gain.setTargetAtTime(1.0, audioCtx.currentTime, 2.0);
 }
 
 export function stopDrone() {
@@ -109,139 +147,187 @@ export function stopDrone() {
     droneGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
 }
 
-// Update drone based on alignment (0-1)
+// --- Core: update drone to mirror coniunctio alignment ---
 export function updateDrone(alignment) {
     if (!initialized || muted) return;
 
-    // When aligned: perfect fifth interval, consonant
-    // When dissonant: slightly detuned, creating beats
-    const detune = (1 - alignment) * 30; // up to 30 cents detuning
-    const secondFreq = DRONE_FIFTH + (1 - alignment) * 8; // slight frequency shift
+    // Smooth the alignment for audio (faster than visual so sound feels responsive)
+    soundAlignment += (alignment - soundAlignment) * 0.05;
+    const a = soundAlignment;
 
-    droneOsc1.frequency.setTargetAtTime(DRONE_BASE, audioCtx.currentTime, 0.5);
-    droneOsc2.frequency.setTargetAtTime(secondFreq, audioCtx.currentTime, 0.5);
-    droneOsc2.detune.setTargetAtTime(detune, audioCtx.currentTime, 0.5);
+    const t = audioCtx.currentTime;
+    const ramp = 2.0; // seconds to crossfade
+
+    // Compute layer volumes based on alignment
+    // Same zones as coniunctio crossfade
+    let dormantVol = 0, searchingVol = 0, balancedVol = 0, harmoniousVol = 0;
+
+    if (a < 0.35) {
+        const blend = a / 0.35;
+        searchingVol = 1 - blend * 0.4;
+        balancedVol = blend * 0.4;
+        dormantVol = Math.max(0, 0.3 - a);
+    } else if (a < 0.65) {
+        const blend = (a - 0.35) / 0.3;
+        searchingVol = Math.max(0, 0.3 - blend * 0.3);
+        balancedVol = 0.7;
+        harmoniousVol = blend * 0.3;
+    } else {
+        const blend = (a - 0.65) / 0.35;
+        balancedVol = 1 - blend;
+        harmoniousVol = blend;
+    }
+
+    // Apply volumes with smooth ramp
+    layers.dormant.gain.gain.setTargetAtTime(dormantVol, t, ramp);
+    layers.searching.gain.gain.setTargetAtTime(searchingVol, t, ramp);
+    layers.balanced.gain.gain.setTargetAtTime(balancedVol, t, ramp);
+    layers.harmonious.gain.gain.setTargetAtTime(harmoniousVol, t, ramp);
+
+    // Modulate filter frequencies based on alignment — brighter when harmonious
+    const filterShift = a * 80; // 0-80 Hz boost
+    layers.searching.filter.frequency.setTargetAtTime(220 + filterShift * 0.3, t, ramp);
+    layers.balanced.filter.frequency.setTargetAtTime(280 + filterShift * 0.5, t, ramp);
+    layers.harmonious.filter.frequency.setTargetAtTime(300 + filterShift, t, ramp);
+
+    // Subtle pitch drift on the searching layer — tones slowly wander
+    if (layers.searching.oscs.length >= 2) {
+        const drift = Math.sin(t * 0.1) * 3; // ±3 Hz slow wander
+        layers.searching.oscs[1].osc.frequency.setTargetAtTime(F3 + drift, t, 1.0);
+    }
+
+    // Balanced layer: fourth oscillator shimmer varies with alignment
+    if (layers.balanced.oscs.length >= 4) {
+        const shimmer = 1 + (1 - a) * 0.02; // more detune when less aligned
+        layers.balanced.oscs[3].osc.frequency.setTargetAtTime(A2 * shimmer, t, 1.0);
+    }
 }
 
-// Crystalline chime — vessel click
+// --- Interaction sounds ---
+
 export function playChime(hue) {
     if (!initialized || muted) return;
 
-    // Map hue to a frequency in a pleasant range
-    const freq = 400 + (hue / 360) * 400; // 400-800 Hz range
+    const freq = 400 + (hue / 360) * 400;
+    const t = audioCtx.currentTime;
 
     const osc = audioCtx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = freq;
-
     const gain = audioCtx.createGain();
-    gain.gain.value = 0.15;
-    gain.gain.setTargetAtTime(0, audioCtx.currentTime + 0.1, 0.3);
+    gain.gain.value = 0.12;
+    gain.gain.setTargetAtTime(0, t + 0.1, 0.4);
 
-    // Add a shimmer — second oscillator slightly detuned
+    // Shimmer — fifth above
     const osc2 = audioCtx.createOscillator();
     osc2.type = 'sine';
-    osc2.frequency.value = freq * 1.5; // fifth above
+    osc2.frequency.value = freq * 1.5;
     const gain2 = audioCtx.createGain();
-    gain2.gain.value = 0.06;
-    gain2.gain.setTargetAtTime(0, audioCtx.currentTime + 0.15, 0.4);
+    gain2.gain.value = 0.05;
+    gain2.gain.setTargetAtTime(0, t + 0.15, 0.5);
 
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc2.connect(gain2);
-    gain2.connect(masterGain);
+    // Soft reverb-like tail — octave below, very quiet
+    const osc3 = audioCtx.createOscillator();
+    osc3.type = 'sine';
+    osc3.frequency.value = freq * 0.5;
+    const gain3 = audioCtx.createGain();
+    gain3.gain.value = 0.03;
+    gain3.gain.setTargetAtTime(0, t + 0.2, 0.8);
 
-    osc.start();
-    osc2.start();
-    osc.stop(audioCtx.currentTime + 1.5);
-    osc2.stop(audioCtx.currentTime + 2);
+    osc.connect(gain); gain.connect(masterGain);
+    osc2.connect(gain2); gain2.connect(masterGain);
+    osc3.connect(gain3); gain3.connect(masterGain);
+
+    osc.start(); osc2.start(); osc3.start();
+    osc.stop(t + 2); osc2.stop(t + 2.5); osc3.stop(t + 3);
 }
 
-// Flame adjustment tone — pitch rises/falls with level
 export function playFlameLevel(level) {
     if (!initialized || muted) return;
 
-    // Low rumble for ember, bright tone for blazing
-    const freq = 150 + level * 80; // 150-550 Hz
+    // Pentatonic scale — always sounds good
+    const notes = [220, 261.63, 293.66, 349.23, 392]; // A3, C4, D4, F4, G4
+    const freq = notes[Math.min(level - 1, notes.length - 1)];
+    const t = audioCtx.currentTime;
 
     const osc = audioCtx.createOscillator();
     osc.type = 'triangle';
     osc.frequency.value = freq;
-
     const gain = audioCtx.createGain();
-    gain.gain.value = 0.08;
-    gain.gain.setTargetAtTime(0, audioCtx.currentTime + 0.05, 0.15);
+    gain.gain.value = 0.07;
+    gain.gain.setTargetAtTime(0, t + 0.05, 0.12);
 
     osc.connect(gain);
     gain.connect(masterGain);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.5);
+    osc.stop(t + 0.4);
 }
 
-// Burst event sound — magnitude 1-3+
 export function playBurst(magnitude) {
     if (!initialized || muted) return;
 
-    // Deep resonant boom, bigger for larger magnitudes
-    const baseFreq = 60 + magnitude * 10;
-    const volume = 0.08 + magnitude * 0.04;
+    const t = audioCtx.currentTime;
+    const baseFreq = 55 + magnitude * 8;
+    const volume = 0.06 + magnitude * 0.03;
     const duration = 0.5 + magnitude * 0.5;
 
+    // Deep fundamental
     const osc = audioCtx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = baseFreq;
-    osc.frequency.setTargetAtTime(baseFreq * 0.5, audioCtx.currentTime, duration * 0.5);
-
+    osc.frequency.setTargetAtTime(baseFreq * 0.6, t, duration * 0.4);
     const gain = audioCtx.createGain();
     gain.gain.value = volume;
-    gain.gain.setTargetAtTime(0, audioCtx.currentTime + 0.1, duration * 0.4);
+    gain.gain.setTargetAtTime(0, t + 0.1, duration * 0.3);
 
-    // Add harmonic overtone
+    // Harmonic shimmer
     const osc2 = audioCtx.createOscillator();
     osc2.type = 'sine';
     osc2.frequency.value = baseFreq * 3;
     const gain2 = audioCtx.createGain();
-    gain2.gain.value = volume * 0.3;
-    gain2.gain.setTargetAtTime(0, audioCtx.currentTime + 0.05, duration * 0.2);
+    gain2.gain.value = volume * 0.25;
+    gain2.gain.setTargetAtTime(0, t + 0.05, duration * 0.2);
 
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 200 + magnitude * 100;
+    // Noise-like high transient for impact
+    const osc3 = audioCtx.createOscillator();
+    osc3.type = 'sawtooth';
+    osc3.frequency.value = baseFreq * 6;
+    const gain3 = audioCtx.createGain();
+    gain3.gain.value = volume * 0.1;
+    gain3.gain.setTargetAtTime(0, t + 0.02, 0.05);
+    const burstFilter = audioCtx.createBiquadFilter();
+    burstFilter.type = 'lowpass';
+    burstFilter.frequency.value = 300 + magnitude * 150;
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(masterGain);
-    osc2.connect(gain2);
-    gain2.connect(masterGain);
+    osc.connect(gain); gain.connect(masterGain);
+    osc2.connect(gain2); gain2.connect(masterGain);
+    osc3.connect(burstFilter); burstFilter.connect(gain3); gain3.connect(masterGain);
 
-    osc.start();
-    osc2.start();
-    osc.stop(audioCtx.currentTime + duration + 1);
-    osc2.stop(audioCtx.currentTime + duration + 0.5);
+    osc.start(); osc2.start(); osc3.start();
+    osc.stop(t + duration + 1);
+    osc2.stop(t + duration + 0.5);
+    osc3.stop(t + 0.3);
 }
 
-// Entry screen ambient — subtle high shimmer
 export function playEntryAmbient() {
     if (!initialized || muted) return;
 
     const osc = audioCtx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.value = 220; // A3
-
+    osc.frequency.value = A2;
     const gain = audioCtx.createGain();
     gain.gain.value = 0;
-    gain.gain.setTargetAtTime(0.06, audioCtx.currentTime, 2.0);
+    gain.gain.setTargetAtTime(0.04, audioCtx.currentTime, 2.0);
 
     const filter = audioCtx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 300;
+    filter.frequency.value = 250;
 
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(masterGain);
     osc.start();
 
-    // Return a handle to stop it
     return {
         stop: () => {
             gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
