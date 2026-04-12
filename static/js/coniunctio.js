@@ -26,6 +26,10 @@ let flashAlpha = 0;
 let flashColor = COLORS.sol.glow;
 let accelBoost = 0;
 
+// Easter egg — the percentage
+let percentageAlpha = 0;
+let percentageValue = 0;
+
 // --- Midjourney Video States ---
 const STATE_NAMES = ['dormant', 'searching', 'balanced', 'harmonious'];
 let stateVideos = {};
@@ -117,6 +121,46 @@ function createBurstParticle(color) {
         alpha: 0.6 + Math.random() * 0.4,
         color, life: 1.0, decay: 0.3 + Math.random() * 0.4,
     };
+}
+
+// --- Event System ---
+
+// --- Easter Egg: The Percentage ---
+
+function computePercentage() {
+    const state = getState();
+    let totalScore = 0;
+    let maxScore = 0;
+
+    for (const v of VESSELS) {
+        const wes = state.wes?.[v.id] || 0;
+        const amelia = state.amelia?.[v.id] || 0;
+        if (wes > 0 || amelia > 0) {
+            // Both contributing + alignment = higher score
+            const avg = (wes + amelia) / 2;
+            const alignment = wes > 0 && amelia > 0 ? 1 - Math.abs(wes - amelia) / 4 : 0;
+            totalScore += (avg / 5) * 0.5 + alignment * 0.5;
+            maxScore += 1;
+        }
+    }
+
+    if (maxScore === 0) return 7; // ;) the starting point
+    return Math.round((totalScore / maxScore) * 100);
+}
+
+export function handleConiunctioClick(x, y) {
+    const dx = x - cx;
+    const dy = y - cy;
+    if (Math.sqrt(dx * dx + dy * dy) < radius * 0.8) {
+        percentageValue = computePercentage();
+        percentageAlpha = 1.0;
+        return true;
+    }
+    return false;
+}
+
+export function getConiunctioCenter() {
+    return { x: cx, y: cy, radius };
 }
 
 // --- Event System ---
@@ -238,6 +282,12 @@ export function updateConiunctio(dt) {
     const alignment = smoothAlignment;
     const intensity = smoothIntensity;
     const baseSpeed = (0.2 + intensity * 0.5) * (1 + accelBoost);
+
+    // Decay percentage easter egg
+    if (percentageAlpha > 0) {
+        percentageAlpha -= dt * 0.25; // fades over ~4 seconds
+        if (percentageAlpha < 0) percentageAlpha = 0;
+    }
 
     // Decay event effects
     accelBoost *= 0.97;
@@ -361,6 +411,21 @@ export function drawConiunctio(ctx) {
         ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    // Easter egg — the percentage
+    if (percentageAlpha > 0) {
+        ctx.save();
+        ctx.globalAlpha = percentageAlpha * 0.7;
+        ctx.font = 'italic 28px Georgia, "Cormorant Garamond", serif';
+        ctx.fillStyle = COLORS.gold;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(percentageValue + '%', cx, cy);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
 }
 
 function drawStateVideos(ctx) {

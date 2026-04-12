@@ -2,7 +2,7 @@ import { setPerson, fetchState, getState } from './state.js';
 import { initEntry, resizeEntry, updateEntry, drawEntry, handleEntryClick, handleEntryMouseMove } from './entry.js';
 import { initVessels, layoutVessels, updateVessels, drawVessels, handleVesselMouseMove, handleVesselClick, getVesselPosition } from './vessels.js';
 import { showFlame, hideFlame, isFlameActive, getFlameVesselId, updateFlame, drawFlame, handleFlameMouseDown, handleFlameDrag, handleFlameMouseUp, isDragging } from './flame.js';
-import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio } from './coniunctio.js';
+import { initConiunctio, layoutConiunctio, updateConiunctio, drawConiunctio, handleConiunctioClick } from './coniunctio.js';
 import { showHistory, hideHistory, isHistoryVisible, updateHistory, drawHistory } from './history.js';
 import { showDetail, hideDetail, isDetailVisible, updateDetail, drawDetail } from './detail.js';
 import { initAtmosphere, layoutAtmosphere, updateAtmosphere, drawAtmosphere } from './atmosphere.js';
@@ -205,7 +205,9 @@ function init() {
             } else if (isHistoryVisible()) {
                 hideHistory();
             } else if (handleStoryClick(x, y)) {
-                // Story icon was clicked — handled
+                // Story icon was clicked
+            } else if (handleConiunctioClick(x, y)) {
+                // Easter egg — percentage revealed
             } else {
                 handleVesselClick(x, y);
             }
