@@ -151,7 +151,8 @@ function computePercentage() {
 export function handleConiunctioClick(x, y) {
     const dx = x - cx;
     const dy = y - cy;
-    if (Math.sqrt(dx * dx + dy * dy) < radius * 0.8) {
+    // Hit target matches the visible orb size (radius * 2.8 * 0.46 from drawStateVideos)
+    if (Math.sqrt(dx * dx + dy * dy) < radius * 1.2) {
         percentageValue = computePercentage();
         percentageAlpha = 1.0;
         return true;
