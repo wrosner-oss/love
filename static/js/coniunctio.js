@@ -431,7 +431,7 @@ export function drawConiunctio(ctx) {
 function drawStateVideos(ctx) {
     if (!videosLoaded) return;
 
-    const displaySize = radius * 2.8; // Large enough to fill the center area
+    const displaySize = radius * 2.8;
     const halfSize = displaySize / 2;
     const clipRadius = displaySize * 0.46;
 
@@ -444,23 +444,24 @@ function drawStateVideos(ctx) {
 
         ctx.save();
 
-        // Circular clip
+        // Soft circular clip using radial gradient as alpha mask
+        // Draw video first, then erase the edges with a destination-out gradient
         ctx.beginPath();
-        ctx.arc(cx, cy, clipRadius, 0, Math.PI * 2);
+        ctx.arc(cx, cy, clipRadius * 1.15, 0, Math.PI * 2);
         ctx.clip();
 
-        // Draw video with weight as alpha
-        // Dormant state is drawn dimmer
-        const alphaMultiplier = name === 'dormant' ? 0.4 : 0.7;
+        const alphaMultiplier = name === 'dormant' ? 0.35 : 0.6;
         ctx.globalAlpha = weight * alphaMultiplier;
         ctx.drawImage(video, cx - halfSize, cy - halfSize, displaySize, displaySize);
 
         ctx.restore();
     }
 
-    // Soft edge fade (same technique as vessels)
-    const fadeGrad = ctx.createRadialGradient(cx, cy, clipRadius * 0.75, cx, cy, clipRadius * 1.1);
-    fadeGrad.addColorStop(0, 'rgba(10, 10, 26, 0)');
+    // Very soft, wide edge fade — gradual blend into background
+    const fadeGrad = ctx.createRadialGradient(cx, cy, clipRadius * 0.5, cx, cy, clipRadius * 1.3);
+    fadeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    fadeGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0)');
+    fadeGrad.addColorStop(0.85, 'rgba(10, 10, 26, 0.6)');
     fadeGrad.addColorStop(1, 'rgba(10, 10, 26, 1)');
     ctx.fillStyle = fadeGrad;
     ctx.beginPath();
