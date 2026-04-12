@@ -12,15 +12,15 @@ let hoverSymbol = null;
 let hoverScale = { wes: 1, amelia: 1 };
 let clickFlash = { wes: 0, amelia: 0 };
 
-// Midjourney art assets
-let bgVideo = null;
+// Art assets
+let bgImage = null;
 let bgReady = false;
 let solImg = null;
 let lunaImg = null;
 let solReady = false;
 let lunaReady = false;
 
-const SYMBOL_SIZE = 90; // display size for Sol/Luna images
+const SYMBOL_SIZE = 90;
 
 const symbols = [
     { id: 'wes', name: 'Wes', color: COLORS.sol.primary, glowColor: COLORS.sol.glow, x: 0, y: 0 },
@@ -48,21 +48,10 @@ export function initEntry(w, h, callback) {
 }
 
 function loadAssets() {
-    // Background video
-    bgVideo = document.createElement('video');
-    bgVideo.src = '/static/images/background.mp4';
-    bgVideo.loop = true;
-    bgVideo.muted = true;
-    bgVideo.playsInline = true;
-    bgVideo.preload = 'auto';
-    bgVideo.style.display = 'none';
-    document.body.appendChild(bgVideo);
-    bgVideo.addEventListener('canplaythrough', () => {
-        bgReady = true;
-        bgVideo.play().catch(() => {});
-    }, { once: true });
-    bgVideo.load();
-    setTimeout(() => { bgReady = true; bgVideo.play().catch(() => {}); }, 3000);
+    // Static background image
+    bgImage = new Image();
+    bgImage.onload = () => { bgReady = true; };
+    bgImage.src = '/static/images/background.png';
 
     // Sol image
     solImg = new Image();
@@ -118,18 +107,17 @@ export function updateEntry(dt) {
 }
 
 export function drawEntry(ctx, w, h) {
-    // Background — Midjourney video or fallback
-    if (bgReady && bgVideo && bgVideo.readyState >= 2) {
-        // Draw video covering the full canvas, maintaining aspect ratio
-        const vw = bgVideo.videoWidth || w;
-        const vh = bgVideo.videoHeight || h;
-        const scale = Math.max(w / vw, h / vh);
-        const dw = vw * scale;
-        const dh = vh * scale;
-        ctx.drawImage(bgVideo, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    // Background — static portal image or fallback
+    if (bgReady && bgImage) {
+        const iw = bgImage.naturalWidth;
+        const ih = bgImage.naturalHeight;
+        const scale = Math.max(w / iw, h / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        ctx.drawImage(bgImage, (w - dw) / 2, (h - dh) / 2, dw, dh);
 
-        // Darken slightly so text/symbols pop
-        ctx.fillStyle = 'rgba(6, 6, 18, 0.35)';
+        // Slight darken so text/symbols pop
+        ctx.fillStyle = 'rgba(6, 6, 18, 0.25)';
         ctx.fillRect(0, 0, w, h);
     } else {
         ctx.fillStyle = COLORS.background;
@@ -152,7 +140,6 @@ export function drawEntry(ctx, w, h) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // Subtle text shadow for readability over background
         ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
         ctx.shadowBlur = 12;
         ctx.fillText('Step Inside', w / 2, h * 0.38);
@@ -190,10 +177,9 @@ export function drawEntry(ctx, w, h) {
                 ctx.globalAlpha = symbolsAlpha;
             }
 
-            // Draw Midjourney image or fallback glyph
+            // Draw image or fallback glyph
             if (imgReady && img) {
                 const halfSize = SYMBOL_SIZE / 2;
-                // Circular clip with soft fade
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(0, 0, halfSize * 0.92, 0, Math.PI * 2);
@@ -203,13 +189,12 @@ export function drawEntry(ctx, w, h) {
                 // Soft edge fade
                 const fadeGrad = ctx.createRadialGradient(0, 0, halfSize * 0.7, 0, 0, halfSize);
                 fadeGrad.addColorStop(0, 'rgba(0,0,0,0)');
-                fadeGrad.addColorStop(1, bgReady ? 'rgba(6,6,18,0.8)' : COLORS.background);
+                fadeGrad.addColorStop(1, 'rgba(6,6,18,0.8)');
                 ctx.fillStyle = fadeGrad;
                 ctx.beginPath();
                 ctx.arc(0, 0, halfSize, 0, Math.PI * 2);
                 ctx.fill();
             } else {
-                // Fallback Unicode glyph
                 ctx.font = '72px serif';
                 ctx.fillStyle = s.color;
                 ctx.textAlign = 'center';
@@ -266,9 +251,4 @@ export function handleEntryMouseMove(x, y, canvas) {
         }
     }
     canvas.style.cursor = 'default';
-}
-
-// Export background video so the athanor screen can reuse it
-export function getBackgroundVideo() {
-    return bgReady && bgVideo && bgVideo.readyState >= 2 ? bgVideo : null;
 }
