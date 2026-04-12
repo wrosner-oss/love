@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  athanor:
+    build: .
+    container_name: athanor
+    restart: unless-stopped
+    ports:
+      - "5557:5000"
+    volumes:
+      - athanor-data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+
+volumes:
+  athanor-data:
