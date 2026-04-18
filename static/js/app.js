@@ -9,6 +9,7 @@ import { initAtmosphere, layoutAtmosphere, updateAtmosphere, drawAtmosphere } fr
 import { startAudio, startDrone, updateDrone, playChime, playBurst, toggleMute, isMuted } from './sound.js';
 import { layoutStory, updateStory, drawStory, handleStoryClick, handleStoryMouseMove, handleStoryScroll, isStoryVisible } from './story.js';
 import { layoutGallery, updateGallery, drawGallery, handleGalleryClick, handleGalleryMouseMove, handleGalleryKey, isGalleryVisible } from './gallery.js';
+import { initMute, restoreMuteIfPending, layoutMute, drawMute, handleMuteClick, handleMuteMouseMove } from './mute.js';
 import { ParticleSystem } from './particles.js';
 import { COLORS, VESSELS } from './constants.js';
 
@@ -42,12 +43,14 @@ function resize() {
         layoutAtmosphere(w, h);
         layoutStory(w, h);
         layoutGallery(w, h);
+        layoutMute(w, h);
         if (athanorParticles) athanorParticles.resize(w, h);
     }
 }
 
 function onPersonSelected(person) {
     startAudio(); // User gesture — safe to init audio
+    restoreMuteIfPending();
     setPerson(person);
     transitionTarget = 'athanor';
     currentScreen = 'transition';
@@ -60,6 +63,7 @@ function onPersonSelected(person) {
         initAtmosphere(w, h);
         layoutStory(w, h);
         layoutGallery(w, h);
+        layoutMute(w, h);
         // Load static background for athanor
         if (!bgImage) {
             bgImage = new Image();
@@ -189,6 +193,9 @@ function drawAthanor(ctx, w, h, dt) {
     updateStory(dt);
     drawStory(ctx, w, h);
 
+    // Mute icon (small, bottom-right, always visible unless gallery is open)
+    drawMute(ctx);
+
     // Gallery — topmost layer, above everything
     updateGallery(dt);
     drawGallery(ctx, w, h);
@@ -213,6 +220,8 @@ function init() {
                 hideDetail();
             } else if (isHistoryVisible()) {
                 hideHistory();
+            } else if (handleMuteClick(x, y)) {
+                // Mute icon was clicked
             } else if (handleGalleryClick(x, y, w, h)) {
                 // Gallery icon was clicked
             } else if (handleStoryClick(x, y)) {
@@ -243,8 +252,9 @@ function init() {
             } else {
                 const galleryHover = handleGalleryMouseMove(x, y, w, h);
                 const storyHover = handleStoryMouseMove(x, y);
+                const muteHover = handleMuteMouseMove(x, y);
                 const hovered = handleVesselMouseMove(x, y);
-                if (galleryHover || storyHover || hovered) {
+                if (galleryHover || storyHover || muteHover || hovered) {
                     canvas.style.cursor = 'pointer';
                 } else if (isFlameActive()) {
                     canvas.style.cursor = 'grab';
@@ -304,6 +314,7 @@ function init() {
         }
     });
 
+    initMute();
     initEntry(w, h, onPersonSelected);
 
     // Primary: requestAnimationFrame
